@@ -1,35 +1,18 @@
-/**
- * 创建元素节点
- * @param {*} type
- * @param {*} props
- * @param {*} children
- * @returns
- */
-function createElement(type, props, ...children) {
-  return {
-    type,
-    props: {
-      ...props,
-      children: children.map((item) =>
-        typeof item === "object" ? item : createTextElement(item)
-      ),
-    },
-  };
-}
+import createElement from "./createElement";
 
-/**
- * 创建文本节点
- * @param {*} text
- * @returns
- */
-function createTextElement(text) {
-  return {
-    type: "TEXT_ELEMENT",
-    props: {
-      nodeValue: text,
-      children: [],
-    },
-  };
+function createDom(fiber) {
+  const dom =
+    fiber.type === "TEXT_ELEMENT"
+      ? document.createTextNode(fiber.type)
+      : document.createElement(fiber.type);
+
+  Object.keys(fiber.props)
+    .filter((key) => key !== "children")
+    .forEach((propKey) => {
+      dom[propKey] = fiber.props[propKey];
+    });
+
+  return dom;
 }
 
 /**
@@ -38,22 +21,68 @@ function createTextElement(text) {
  * @param {*} container
  */
 function render(element, container) {
-  const dom =
-    element.type === "TEXT_ELEMENT"
-      ? document.createTextNode(element.type)
-      : document.createElement(element.type);
+  nextUnitOfWork = {
+    dom: container,
+    props: {
+      children: [element],
+    },
+  };
+}
 
-  Object.keys(element.props)
-    .filter((key) => key !== "children")
-    .forEach((propKey) => {
-      dom[propKey] = element.props[propKey];
-    });
+let nextUnitOfWork = null;
 
-  element.props.children.forEach((child) => {
-    render(child, dom);
-  });
+function workLoop(deadline) {
+  let shouldYield = false;
+  while (nextUnitOfWork && !shouldYield) {
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
+    shouldYield = deadline.timeRemaining() < 1;
+  }
+  requestIdleCallback(workLoop);
+}
 
-  container.appendChild(dom);
+function performUnitOfWork(fiber) {
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+
+  if (fiber.parent) {
+    fiber.parent.dom.appendChild(fiber.dom);
+  }
+
+  const elements = fiber.props.children;
+  let index = 0;
+  let prevSibling = null;
+
+  while (index < elements.element) {
+    const element = elements[index];
+
+    const newFiber = {
+      type: element.type,
+      props: element.props,
+      parent: fiber,
+      dom: null,
+    };
+
+    if (index === 0) {
+      fiber.children = newFiber;
+    } else {
+      prevSibling.sibling = newFiber;
+    }
+
+    prevSibling = newFiber;
+    index++;
+  }
+
+  if (fiber.child) {
+    return fiber.child;
+  }
+  let nextFiber = fiber;
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling;
+    }
+    nextFiber = nextFiber.parent;
+  }
 }
 
 const Didact = {

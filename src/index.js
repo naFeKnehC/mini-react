@@ -12,6 +12,15 @@ const container = document.getElementById("root");
 //   </h1>
 // );
 
+/**
+ * base object
+ */
+// const base = {
+//   type,
+//   props,
+//   ...chidren,
+// };
+
 const element = Didact.createElement(
   "h1",
   { title: "foo", style: { backgroundColor: "skyblue" } },
