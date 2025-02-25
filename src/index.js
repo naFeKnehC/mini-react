@@ -8,18 +8,12 @@ const container = document.getElementById("root");
 //     <a href="https://bilibili.com" target="_blank">
 //       点击跳转b站
 //     </a>
-//     <div>only text node</div>
+//     <div>
+//       <h2>h2 only text node</h2>
+//       <h3>h3节点</h3>
+//     </h2>
 //   </h1>
 // );
-
-/**
- * base object
- */
-// const base = {
-//   type,
-//   props,
-//   ...chidren,
-// };
 
 const element = Didact.createElement(
   "h1",
@@ -29,7 +23,16 @@ const element = Didact.createElement(
     { href: "https://bilibili.com", target: "_blank" },
     "点击跳转b站"
   ),
-  Didact.createElement("div", null, "only text node")
+  Didact.createElement(
+    "div",
+    null,
+    Didact.createElement(
+      "div",
+      null,
+      Didact.createElement("h2", null, "h2 only text node"),
+      Didact.createElement("h3", null, "h3节点")
+    )
+  )
 );
 
 Didact.render(element, container);

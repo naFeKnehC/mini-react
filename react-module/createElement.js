@@ -5,12 +5,12 @@
  * @param {*} children
  * @returns
  */
-function createElement(type, props, ...children) {
+function createElement(type, props, ...childrens) {
   return {
     type,
     props: {
       ...props,
-      children: children.map((item) =>
+      children: childrens.map((item) =>
         typeof item === "object" ? item : createTextElement(item)
       ),
     },
