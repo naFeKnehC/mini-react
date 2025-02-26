@@ -27,7 +27,8 @@ const element = Didact.createElement(
     "div",
     null,
     Didact.createElement("h2", null, "h2 only text node"),
-    Didact.createElement("h3", null, "h3节点")
+    Didact.createElement("h3", null, "h3-1节点"),
+    Didact.createElement("h3", null, "h3-2节点")
   )
 );
 

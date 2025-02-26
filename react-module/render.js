@@ -19,12 +19,19 @@ function createDom(fiber) {
 }
 
 /**
+ * 下一个工作单元
+ * 其实本质就是一个fiber对象
+ */
+let nextUnitOfWork = null;
+let wipRoot = null;
+
+/**
  * 创建首个工作单元，开始渲染
  * @param {*} element
  * @param {*} container
  */
 function render(element, container) {
-  nextUnitOfWork = {
+  wipRoot = {
     dom: container,
     props: {
       children: [element],
@@ -32,13 +39,26 @@ function render(element, container) {
     parent: null,
     sibling: null,
   };
+
+  nextUnitOfWork = wipRoot;
 }
 
-/**
- * 下一个工作单元
- * 其实本质就是一个fiber对象
- */
-let nextUnitOfWork = null;
+function commitRoot() {
+  commitWork(wipRoot.child);
+  wipRoot = null;
+}
+
+function commitWork(fiber) {
+  if (!fiber) {
+    return;
+  }
+
+  const parentDom = fiber.parent.dom;
+  parentDom.appendChild(fiber.dom);
+
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
+}
 
 function workLoop(deadline) {
   // 是否应该停止工作
@@ -49,6 +69,11 @@ function workLoop(deadline) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     // 当前剩余时间小于1毫秒时，应该停止工作
     shouldYield = deadline.timeRemaining() < 1;
+  }
+
+  // 当没有下一个工作单元且存在正在工作中的树时
+  if (!nextUnitOfWork && wipRoot) {
+    commitRoot();
   }
 
   requestIdleCallback(workLoop);
@@ -73,12 +98,6 @@ function performUnitOfWork(fiber) {
   if (!fiber.dom) {
     // 如果没有，则调用createDom函数为其创建一个DOM节点
     fiber.dom = createDom(fiber);
-  }
-
-  // 检查当前fiber是否有父节点
-  if (fiber.parent) {
-    // 如果有，则将当前fiber的DOM节点插入到其父节点的DOM节点中
-    fiber.parent.dom.appendChild(fiber.dom);
   }
 
   // 从当前fiber的props中取出所有子元素
