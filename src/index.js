@@ -1,6 +1,6 @@
-import Didact from "../react-module";
+import Didact from '../react-module';
 
-const container = document.getElementById("root");
+const container = document.getElementById('root');
 
 // /** @jsx Didact.createElement */
 // const elementTemplate = (
@@ -16,20 +16,20 @@ const container = document.getElementById("root");
 // );
 
 const element = Didact.createElement(
-  "h1",
-  { title: "foo", style: "background-color: skyblue" },
+  'h1',
+  { title: 'foo', style: 'background-color: skyblue' },
   Didact.createElement(
-    "a",
-    { href: "https://bilibili.com", target: "_blank" },
-    "点击跳转b站"
+    'a',
+    { href: 'https://bilibili.com', target: '_blank' },
+    '点击跳转b站',
   ),
   Didact.createElement(
-    "div",
+    'div',
     null,
-    Didact.createElement("h2", null, "h2 only text node"),
-    Didact.createElement("h3", null, "h3-1节点"),
-    Didact.createElement("h3", null, "h3-2节点")
-  )
+    Didact.createElement('h2', null, 'h2 only text node'),
+    Didact.createElement('h3', null, 'h3-1节点'),
+    Didact.createElement('h3', null, 'h3-2节点'),
+  ),
 );
 
 Didact.render(element, container);

@@ -5,12 +5,12 @@
  */
 function createDom(fiber) {
   const dom =
-    fiber.type === "TEXT_ELEMENT"
+    fiber.type === 'TEXT_ELEMENT'
       ? document.createTextNode(fiber.type)
       : document.createElement(fiber.type);
 
   Object.keys(fiber.props)
-    .filter((key) => key !== "children")
+    .filter((key) => key !== 'children')
     .forEach((propKey) => {
       dom[propKey] = fiber.props[propKey];
     });
