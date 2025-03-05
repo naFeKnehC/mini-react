@@ -6,13 +6,18 @@
  * @returns
  */
 function createElement(type, props, ...childrens) {
+  // input 元素等不存在子元素，childrens 可能为 null[]
+  const notNull = (value) => value !== null;
+
   return {
     type,
     props: {
       ...props,
-      children: childrens.map((item) =>
-        typeof item === "object" ? item : createTextElement(item)
-      ),
+      children: childrens
+        .filter(notNull)
+        .map((item) =>
+          typeof item === 'object' ? item : createTextElement(item),
+        ),
     },
   };
 }
@@ -24,7 +29,7 @@ function createElement(type, props, ...childrens) {
  */
 function createTextElement(text) {
   return {
-    type: "TEXT_ELEMENT",
+    type: 'TEXT_ELEMENT',
     props: {
       nodeValue: text,
       children: [],

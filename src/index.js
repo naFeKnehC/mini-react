@@ -4,32 +4,44 @@ const container = document.getElementById('root');
 
 // /** @jsx Didact.createElement */
 // const elementTemplate = (
-//   <h1 title="foo" style={{ backgroundColor: "skyblue" }}>
-//     <a href="https://bilibili.com" target="_blank">
-//       点击跳转b站
-//     </a>
+//   <h1 title="foo" style={{ backgroundColor: 'skyblue' }}>
+//     h1节点-初始值
 //     <div>
-//       <h2>h2 only text node</h2>
-//       <h3>h3节点</h3>
+//       <input onInput={handleChangeElement} />
 //     </div>
+//     <h2>value1</h2>
 //   </h1>
 // );
 
-const element = Didact.createElement(
-  'h1',
-  { title: 'foo', style: 'background-color: skyblue' },
-  Didact.createElement(
-    'a',
-    { href: 'https://bilibili.com', target: '_blank' },
-    '点击跳转b站',
-  ),
-  Didact.createElement(
-    'div',
-    null,
-    Didact.createElement('h2', null, 'h2 only text node'),
-    Didact.createElement('h3', null, 'h3-1节点'),
-    Didact.createElement('h3', null, 'h3-2节点'),
-  ),
-);
+const handleChangeElement = (value) => {
+  render(value);
+};
 
-Didact.render(element, container);
+const render = (value) => {
+  const element = Didact.createElement(
+    'h1',
+    { title: 'foo', style: 'background-color: skyblue' },
+    `h1节点-${value}`,
+    Didact.createElement(
+      'div',
+      null,
+      Didact.createElement(
+        'input',
+        { oninput: (e) => handleChangeElement(e.target.value) },
+        null,
+      ),
+    ),
+  );
+
+  if (value === '1') {
+    element.props.children.push(Didact.createElement('h2', null, 'value1'));
+  } else {
+    element.props.children = element.props.children.filter(
+      (item) => item.type !== 'h2',
+    );
+  }
+
+  Didact.render(element, container);
+};
+
+render('初始值');

@@ -23,10 +23,21 @@ function createDom(fiber) {
  * 其实本质就是一个fiber对象
  */
 let nextUnitOfWork = null;
+/**
+ * 工作中的树，根节点
+ */
 let wipRoot = null;
+/**
+ * 上一次渲染的树，根节点
+ */
+let currentRoot = null;
+/**
+ * 需要删除的fiber节点
+ */
+let deleteOptions = null;
 
 /**
- * 创建首个工作单元，开始渲染
+ * 初始化首个工作单元，开始渲染
  * @param {*} element
  * @param {*} container
  */
@@ -36,15 +47,20 @@ function render(element, container) {
     props: {
       children: [element],
     },
+    alternate: currentRoot,
     parent: null,
     sibling: null,
   };
 
+  deleteOptions = [];
   nextUnitOfWork = wipRoot;
 }
 
 function commitRoot() {
+  deleteOptions.forEach(commitWork);
   commitWork(wipRoot.child);
+
+  currentRoot = wipRoot;
   wipRoot = null;
 }
 
@@ -54,14 +70,52 @@ function commitWork(fiber) {
   }
 
   const parentDom = fiber.parent.dom;
-  parentDom.appendChild(fiber.dom);
+
+  if (fiber.effectTag === 'PLACEMENT') {
+    parentDom.appendChild(fiber.dom);
+  } else if (fiber.effectTag === 'DELETION') {
+    parentDom.removeChild(fiber.dom);
+  } else if (fiber.effectTag === 'UPDATE') {
+    updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+  }
 
   commitWork(fiber.child);
   commitWork(fiber.sibling);
 }
 
+function updateDom(dom, prevProps, nextProps) {
+  const unChildrenProp = (key) => key !== 'children';
+  const isEvent = (key) => key.startsWith('on');
+
+  // 清楚所有旧属性
+  Object.keys(prevProps)
+    .filter(unChildrenProp)
+    .forEach((key) => (dom[key] = ''));
+
+  //设置新属性
+  Object.keys(nextProps)
+    .filter(unChildrenProp)
+    .forEach((key) => (dom[key] = nextProps[key]));
+
+  // 清除所有旧事件
+  Object.keys(prevProps)
+    .filter(isEvent)
+    .forEach((key) => {
+      const eventType = key.toLowerCase().substring(2);
+      dom.removeEventListener(eventType, prevProps[key]);
+    });
+
+  // 绑定新事件
+  Object.keys(nextProps)
+    .filter(isEvent)
+    .forEach((key) => {
+      const eventType = key.toLowerCase().substring(2);
+      dom.addEventListener(eventType, nextProps[key]);
+    });
+}
+
 function workLoop(deadline) {
-  // 是否应该停止工作
+  // 是否应该停止工作`
   let shouldYield = false;
 
   // 当存在下一个工作且不应该停止工作时
@@ -86,7 +140,7 @@ function workLoop(deadline) {
 requestIdleCallback(workLoop);
 
 /**
- * 将当前fiber对象dom化，并插入至父节点
+ * 将当前fiber对象dom化
  * 将当fiber所有子节点的parent指针指向自身
  * 将child指向第一个子节点，child的sibiling指针依次指向下一个子节点
  * 返回下一个fiber
@@ -102,33 +156,7 @@ function performUnitOfWork(fiber) {
 
   // 从当前fiber的props中取出所有子元素
   const elements = fiber.props.children;
-  // 用于记录前一个兄弟节点的指针
-  let prevSibling = null;
-
-  // 遍历当前fiber的所有子元素
-  for (let index = 0; index < elements.length; index++) {
-    const element = elements[index];
-
-    // 为每个子元素创建一个新的fiber对象，并设置其父节点为当前fiber
-    const newFiber = {
-      type: element.type,
-      props: element.props,
-      parent: fiber,
-      dom: null,
-    };
-
-    // 如果是第一个子元素
-    if (index === 0) {
-      // 将其设置为当前fiber的子节点
-      fiber.child = newFiber;
-    } else {
-      // 否则，将其设置为前一个兄弟节点的兄弟节点
-      prevSibling.sibling = newFiber;
-    }
-
-    // 更新前一个兄弟节点的指针为当前新创建的fiber
-    prevSibling = newFiber;
-  }
+  reconcileChildren(fiber, elements);
 
   // 检查当前fiber是否有子节点
   if (fiber.child) {
@@ -152,6 +180,74 @@ function performUnitOfWork(fiber) {
     }
     // 如果没有兄弟节点，则将当前fiber的父节点作为下一个要处理的fiber
     nextFiber = nextFiber.parent;
+  }
+}
+
+/**
+ * 当前fiber子元素fiber化，挂载关联关系
+ * @param {*} wipFiber
+ * @param {*} elements
+ */
+function reconcileChildren(wipFiber, elements) {
+  // 用于记录前一个兄弟节点的指针
+  let prevSibling = null;
+  // 上一次渲染中当前fiber的child节点
+  let oldChildFiber = wipFiber.alternate && wipFiber.alternate.child;
+  let index = 0;
+
+  // 遍历当前fiber的所有子元素，和旧fiber的所有子节点
+  while (index < 0 || oldChildFiber) {
+    let newFiber = null;
+    const element = elements[index];
+
+    // 如果存在新的子节点和旧的子节点，且type相同，视为相同类型，可以复用dom节点，无需二次创建（优化点）
+    const sameType =
+      oldChildFiber && element && element.type === oldChildFiber.type;
+
+    if (sameType) {
+      // 存在相同类型节点，更新props即可
+      // 真实的react 还使用 React.key 来确定是否做了移动
+      newFiber = {
+        type: oldChildFiber.type,
+        props: element.props,
+        parent: wipFiber,
+        dom: oldChildFiber.dom,
+        alternate: oldChildFiber,
+        effectTag: 'UPDATE',
+      };
+    }
+    if (element && !sameType) {
+      // 存在新节点，且type不同，创建新节点
+      newFiber = {
+        type: element.type,
+        props: element.props,
+        parent: wipFiber,
+        dom: null,
+        alternate: null,
+        effectTag: 'PLACEMENT',
+      };
+    }
+    if (oldChildFiber && !sameType) {
+      // 不存在新节点，且存在旧节点，删除旧节点
+      oldChildFiber.effectTag = 'DELETION';
+      deleteOptions.push(oldChildFiber);
+    }
+
+    // 如果是第一个子元素
+    if (index === 0) {
+      // 将其设置为当前fiber的子节点
+      wipFiber.child = newFiber;
+    } else {
+      // 否则，将其设置为前一个兄弟节点的兄弟节点
+      prevSibling.sibling = newFiber;
+    }
+
+    // 更新前一个兄弟节点的指针为当前新创建的fiber
+    prevSibling = newFiber;
+
+    // 如果存在旧节点，将其指向下一个兄弟节点
+    oldChildFiber = oldChildFiber?.sibling;
+    index++;
   }
 }
 
