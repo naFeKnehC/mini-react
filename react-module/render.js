@@ -9,11 +9,7 @@ function createDom(fiber) {
       ? document.createTextNode(fiber.type)
       : document.createElement(fiber.type);
 
-  Object.keys(fiber.props)
-    .filter((key) => key !== 'children')
-    .forEach((propKey) => {
-      dom[propKey] = fiber.props[propKey];
-    });
+  updateDom(dom, {}, fiber.props);
 
   return dom;
 }
@@ -102,8 +98,8 @@ function commitDeletion(fiber, parentDom) {
 }
 
 function updateDom(dom, prevProps, nextProps) {
-  const unChildrenProp = (key) => key !== 'children';
   const isEvent = (key) => key.startsWith('on');
+  const unChildrenProp = (key) => key !== 'children' && !isEvent(key);
 
   // 清楚所有旧属性
   Object.keys(prevProps)
@@ -200,10 +196,46 @@ function performUnitOfWork(fiber) {
   }
 }
 
+let wipFiber = null;
+let hookIndex = null;
+
 const updateFunctionComponent = (fiber) => {
+  wipFiber = fiber;
+  hookIndex = 0;
+  wipFiber.hooks = [];
+
   const elements = [fiber.type(fiber.props)];
   reconcileChildren(fiber, elements);
 };
+
+export function useState(initial) {
+  const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: [],
+  };
+
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach((action) => {
+    hook.state = action(hook.state);
+  });
+
+  const setState = (action) => {
+    hook.queue.push(action);
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    };
+    nextUnitOfWork = wipRoot;
+    deleteOptions = [];
+  };
+
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+
+  return [hook.state, setState];
+}
 
 const updateHostComponent = (fiber) => {
   // 检查当前fiber是否已经有对应的DOM节点
