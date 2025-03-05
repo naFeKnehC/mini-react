@@ -1,7 +1,5 @@
 import Didact from '../react-module';
 
-const container = document.getElementById('root');
-
 // /** @jsx Didact.createElement */
 // const elementTemplate = (
 //   <h1 title="foo" style={{ backgroundColor: 'skyblue' }}>
@@ -13,12 +11,22 @@ const container = document.getElementById('root');
 //   </h1>
 // );
 
+const container = document.getElementById('root');
+
+// function App(params) {
+//   return Didact.createElement('h1', null, `h1节点-${params.name}`);
+// }
+
+// const element = Didact.createElement(App, { name: '初始值' });
+
+// Didact.render(element, container);
+
 const handleChangeElement = (value) => {
   render(value);
 };
 
-const render = (value) => {
-  const element = Didact.createElement(
+function App({ value }) {
+  return Didact.createElement(
     'h1',
     { title: 'foo', style: 'background-color: skyblue' },
     `h1节点-${value}`,
@@ -32,14 +40,18 @@ const render = (value) => {
       ),
     ),
   );
+}
 
-  if (value === '1') {
-    element.props.children.push(Didact.createElement('h2', null, 'value1'));
-  } else {
-    element.props.children = element.props.children.filter(
-      (item) => item.type !== 'h2',
-    );
-  }
+const render = (value) => {
+  const element = Didact.createElement(App, { value });
+
+  // if (value === '1') {
+  //   element.props.children.push(Didact.createElement('h2', null, 'value1'));
+  // } else {
+  //   element.props.children = element.props.children.filter(
+  //     (item) => item.type !== 'h2',
+  //   );
+  // }
 
   Didact.render(element, container);
 };

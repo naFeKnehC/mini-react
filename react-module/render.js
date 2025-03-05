@@ -69,18 +69,36 @@ function commitWork(fiber) {
     return;
   }
 
-  const parentDom = fiber.parent.dom;
+  /**
+   * 存在type为function App的fiber节点
+   * 此节点不存在dom节点
+   * 删除/新增时，需要找到存在dom节点子/父节点
+   * 更新时跳过函数类型的fiber节点
+   */
+  let domParentFiber = fiber.parent;
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent;
+  }
+  const parentDom = domParentFiber.dom;
 
-  if (fiber.effectTag === 'PLACEMENT') {
+  if (fiber.effectTag === 'PLACEMENT' && fiber.dom !== null) {
     parentDom.appendChild(fiber.dom);
   } else if (fiber.effectTag === 'DELETION') {
-    parentDom.removeChild(fiber.dom);
-  } else if (fiber.effectTag === 'UPDATE') {
+    commitDeletion(fiber, parentDom);
+  } else if (fiber.effectTag === 'UPDATE' && fiber.dom !== null) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
   }
 
   commitWork(fiber.child);
   commitWork(fiber.sibling);
+}
+
+function commitDeletion(fiber, parentDom) {
+  if (fiber.dom) {
+    parentDom.removeChild(fiber.dom);
+  } else {
+    commitDeletion(fiber.child, parentDom);
+  }
 }
 
 function updateDom(dom, prevProps, nextProps) {
@@ -148,15 +166,14 @@ requestIdleCallback(workLoop);
  * @returns 返回优先级：child > sibling > parent
  */
 function performUnitOfWork(fiber) {
-  // 检查当前fiber是否已经有对应的DOM节点
-  if (!fiber.dom) {
-    // 如果没有，则调用createDom函数为其创建一个DOM节点
-    fiber.dom = createDom(fiber);
-  }
+  const isFunctionComponent = fiber.type instanceof Function;
 
-  // 从当前fiber的props中取出所有子元素
-  const elements = fiber.props.children;
-  reconcileChildren(fiber, elements);
+  if (isFunctionComponent) {
+    // 函数组件
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
+  }
 
   // 检查当前fiber是否有子节点
   if (fiber.child) {
@@ -183,6 +200,23 @@ function performUnitOfWork(fiber) {
   }
 }
 
+const updateFunctionComponent = (fiber) => {
+  const elements = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, elements);
+};
+
+const updateHostComponent = (fiber) => {
+  // 检查当前fiber是否已经有对应的DOM节点
+  if (!fiber.dom) {
+    // 如果没有，则调用createDom函数为其创建一个DOM节点
+    fiber.dom = createDom(fiber);
+  }
+
+  // 从当前fiber的props中取出所有子元素
+  const elements = fiber.props.children;
+  reconcileChildren(fiber, elements);
+};
+
 /**
  * 当前fiber子元素fiber化，挂载关联关系
  * @param {*} wipFiber
@@ -196,7 +230,7 @@ function reconcileChildren(wipFiber, elements) {
   let index = 0;
 
   // 遍历当前fiber的所有子元素，和旧fiber的所有子节点
-  while (index < 0 || oldChildFiber) {
+  while (index < elements.length || oldChildFiber) {
     let newFiber = null;
     const element = elements[index];
 
