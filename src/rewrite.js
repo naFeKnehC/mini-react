@@ -20,19 +20,30 @@ const createTextElement = (text) => {
   };
 };
 
-const render = (element, container) => {
+/**
+ * 根据fiber对象创建dom节点
+ * @param {*} fiber
+ */
+const createDom = (fiber) => {
   const dom =
-    element.type === 'TEXT_ELEMENT'
+    fiber.type === 'TEXT_ELEMENT'
       ? document.createTextNode('')
-      : document.createElement(element.type);
+      : document.createElement(fiber.type);
 
-  Object.keys(element.props)
+  Object.keys(fiber.props)
     .filter((key) => key !== 'children')
-    .forEach((key) => (dom[key] = element.props[key]));
+    .forEach((key) => (dom[key] = fiber.props[key]));
 
-  element.props.children.forEach((child) => render(child, dom));
+  return dom;
+};
 
-  container.appendChild(dom);
+const render = (element, container) => {
+  nextUnitOfWork = {
+    dom: container,
+    props: {
+      children: [element],
+    },
+  };
 };
 
 let nextUnitOfWork = null;
@@ -49,7 +60,53 @@ function workLoop(deadline) {
 requestIdleCallback(workLoop);
 
 function performUnitOfWork(nextUnitOfWork) {
-  // TODO
+  const fiber = nextUnitOfWork;
+
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+
+  if (fiber.parent) {
+    fiber.parent.dom.appendChild(fiber.dom);
+  }
+
+  const elements = fiber.props.children;
+
+  let index = 0;
+  let prevSibling = null;
+
+  while (index < elements.length) {
+    const element = elements[index];
+
+    const newFiber = {
+      parent: fiber,
+      dom: null,
+      type: element.type,
+      props: element.props,
+    };
+
+    if (index === 0) {
+      fiber.child = newFiber;
+    } else {
+      prevSibling.sibling = newFiber;
+    }
+
+    prevSibling = newFiber;
+    index++;
+  }
+
+  if (fiber.child) {
+    return fiber.child;
+  }
+
+  let nextFiber = fiber;
+
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling;
+    }
+    nextFiber = nextFiber.parent;
+  }
 }
 
 const miniReact = {
@@ -69,7 +126,7 @@ const element = miniReact.createElement(
   miniReact.createElement('p', null, 'hello world'),
   miniReact.createElement(
     'a',
-    { href: 'www.bilibili.com', target: '_blank' },
+    { href: 'https://www.bilibili.com', target: '_blank' },
     'goto bilibili',
   ),
 );
