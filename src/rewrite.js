@@ -38,36 +38,56 @@ const createDom = (fiber) => {
 };
 
 const render = (element, container) => {
-  nextUnitOfWork = {
+  wipRoot = {
     dom: container,
     props: {
       children: [element],
     },
   };
+
+  nextUnitOfWork = wipRoot;
 };
 
 let nextUnitOfWork = null;
+let wipRoot = null;
 
 function workLoop(deadline) {
   let shouldYield = false;
+
   while (nextUnitOfWork && !shouldYield) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
   }
+
+  if (wipRoot && !nextUnitOfWork) {
+    commitRoot();
+  }
+
   requestIdleCallback(workLoop);
 }
 
 requestIdleCallback(workLoop);
+
+function commitRoot() {
+  commitWork(wipRoot.child);
+  wipRoot = null;
+}
+
+function commitWork(fiber) {
+  if (!fiber) {
+    return;
+  }
+
+  fiber.parent.dom.appendChild(fiber.dom);
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
+}
 
 function performUnitOfWork(nextUnitOfWork) {
   const fiber = nextUnitOfWork;
 
   if (!fiber.dom) {
     fiber.dom = createDom(fiber);
-  }
-
-  if (fiber.parent) {
-    fiber.parent.dom.appendChild(fiber.dom);
   }
 
   const elements = fiber.props.children;
@@ -117,9 +137,12 @@ const miniReact = {
 // const referenceElement = (
 //   <div id="foo">
 //     <p>hello world</p>
-//     <a target="_blank" href="www.bilibili.com" />
+//     <a target="_blank" href="www.bilibili.com">
+//       goto bilibili
+//     </a>
 //   </div>
 // );
+
 const element = miniReact.createElement(
   'div',
   { id: 'foo' },
