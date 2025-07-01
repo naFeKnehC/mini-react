@@ -110,14 +110,19 @@ function commitWork(fiber) {
     return;
   }
 
-  const domParent = fiber.parent.dom;
+  let domParentFiber = fiber.parent;
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent;
+  }
+  const domParent = domParentFiber.dom;
+
   if (fiber.effectTag === 'PLACEMENT' && fiber.dom) {
     domParent.appendChild(fiber.dom);
   }
-  if (fiber.effectTag === 'DELETION') {
-    domParent.removeChild(fiber.dom);
+  if (fiber.effectTag === 'DELETION' && fiber) {
+    commitDeletion(fiber, domParent);
   }
-  if (fiber.effectTag === 'UPDATE') {
+  if (fiber.effectTag === 'UPDATE' && fiber.dom) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
   }
 
@@ -125,15 +130,22 @@ function commitWork(fiber) {
   commitWork(fiber.sibling);
 }
 
+function commitDeletion(fiber, domParent) {
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom);
+  } else {
+    commitDeletion(fiber.child, domParent);
+  }
+}
+
 function performUnitOfWork(nextUnitOfWork) {
   const fiber = nextUnitOfWork;
 
-  if (!fiber.dom) {
-    fiber.dom = createDom(fiber);
+  if (fiber.type instanceof Function) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
   }
-
-  const elements = fiber.props.children;
-  reconcileChildren(fiber, elements);
 
   if (fiber.child) {
     return fiber.child;
@@ -147,6 +159,19 @@ function performUnitOfWork(nextUnitOfWork) {
     }
     nextFiber = nextFiber.parent;
   }
+}
+
+function updateHostComponent(fiber) {
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+  const elements = fiber.props.children;
+  reconcileChildren(fiber, elements);
+}
+
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, children);
 }
 
 function reconcileChildren(wipFiber, elements) {
@@ -223,13 +248,12 @@ const updateValue = (e) => {
 //   </div>
 // );
 
-function initRender(value) {
-  const element = miniReact.createElement(
+function App(props) {
+  return miniReact.createElement(
     'div',
     { id: 'foo' },
-    value.substring(value.length - 1, value.length) === '1'
-      ? miniReact.createElement('h1', null, '111')
-      : miniReact.createElement('h2', null, '222'),
+    props.value,
+    miniReact.createElement('h1', null, props.value),
     miniReact.createElement(
       'input',
       {
@@ -237,16 +261,11 @@ function initRender(value) {
       },
       '',
     ),
-    // miniReact.createElement(
-    //   'a',
-    //   {
-    //     href: 'https://www.bilibili.com',
-    //     target: '_blank',
-    //     style: 'color: blue;display: block;',
-    //   },
-    //   value,
-    // ),
   );
+}
+
+function initRender(value) {
+  const element = miniReact.createElement(App, { value });
 
   miniReact.render(element, container);
 }
