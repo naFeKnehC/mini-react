@@ -169,9 +169,51 @@ function updateHostComponent(fiber) {
   reconcileChildren(fiber, elements);
 }
 
+let wipFiber = null;
+let hookIndex = null;
+
 function updateFunctionComponent(fiber) {
+  wipFiber = fiber;
+  hookIndex = 0;
+  wipFiber.hooks = [];
   const children = [fiber.type(fiber.props)];
   reconcileChildren(fiber, children);
+}
+
+function useState(initial) {
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: [],
+  };
+
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach((action) => {
+    hook.state = action(hook.state);
+  });
+
+  const setState = (action) => {
+    // 将直接更新转换为函数式更新
+    const wrappedAction =
+      typeof action === 'function' ? action : (currentState) => action; // 使用参数名避免闭包问题
+
+    hook.queue.push(wrappedAction);
+
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    };
+    nextUnitOfWork = wipRoot;
+    deletions = [];
+  };
+
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+  return [hook.state, setState];
 }
 
 function reconcileChildren(wipFiber, elements) {
@@ -228,6 +270,7 @@ function reconcileChildren(wipFiber, elements) {
 }
 
 const miniReact = {
+  useState,
   render,
   createElement,
 };
@@ -248,12 +291,26 @@ const updateValue = (e) => {
 //   </div>
 // );
 
-function App(props) {
+function App() {
+  const [state, setState] = miniReact.useState(1);
+
   return miniReact.createElement(
     'div',
-    { id: 'foo' },
-    props.value,
-    miniReact.createElement('h1', null, props.value),
+    {
+      id: 'foo',
+      onClick: () => {
+        // 测试直接更新
+        setState(state + 1);
+        setState(state + 1);
+        setState(state + 1);
+        // 测试函数式更新
+        setState((s) => s + 1);
+        setState((s) => s + 1);
+        setState((s) => s + 1);
+      },
+    },
+    'add num (click to test both update styles)',
+    miniReact.createElement('h1', null, state),
     miniReact.createElement(
       'input',
       {
@@ -264,10 +321,6 @@ function App(props) {
   );
 }
 
-function initRender(value) {
-  const element = miniReact.createElement(App, { value });
+const element = miniReact.createElement(App);
 
-  miniReact.render(element, container);
-}
-
-initRender('please input');
+miniReact.render(element, container);
