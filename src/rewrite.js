@@ -181,26 +181,22 @@ function updateFunctionComponent(fiber) {
 }
 
 function useState(initial) {
-  const oldHook =
-    wipFiber.alternate &&
-    wipFiber.alternate.hooks &&
-    wipFiber.alternate.hooks[hookIndex];
+  const oldFier = wipFiber.alternate;
+  const oldHook = oldFier && oldFier.hooks && oldFier.hooks[hookIndex];
+
   const hook = {
     state: oldHook ? oldHook.state : initial,
     queue: [],
   };
 
   const actions = oldHook ? oldHook.queue : [];
+
   actions.forEach((action) => {
-    hook.state = action(hook.state);
+    hook.state = typeof action === 'function' ? action(hook.state) : action;
   });
 
   const setState = (action) => {
-    // 将直接更新转换为函数式更新
-    const wrappedAction =
-      typeof action === 'function' ? action : (currentState) => action; // 使用参数名避免闭包问题
-
-    hook.queue.push(wrappedAction);
+    hook.queue.push(action);
 
     wipRoot = {
       dom: currentRoot.dom,
@@ -300,13 +296,13 @@ function App() {
       id: 'foo',
       onClick: () => {
         // 测试直接更新
-        setState(state + 1);
-        setState(state + 1);
-        setState(state + 1);
-        // 测试函数式更新
+        // setState(state + 1);
+        // setState(state + 1);
+        // setState(state + 1);
+        // // 测试函数式更新
         setState((s) => s + 1);
         setState((s) => s + 1);
-        setState((s) => s + 1);
+        // setState((s) => s + 1);
       },
     },
     'add num (click to test both update styles)',
